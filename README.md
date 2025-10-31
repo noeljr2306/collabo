@@ -1,4 +1,17 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Collabo
+
+**Collabo** is a real-time code collaboration platform designed for developers. It enables seamless pair programming, team collaboration, and instant code sharing without the hassle of merge conflicts or complex setups.
+
+**Note:** This project is currently under development. Features may be incomplete, and breaking changes are expected.
+
+## Features
+
+- **Live Code Collaboration**: Watch teammates code line-by-line in real-time, just like pair programming.
+- **Real-Time Chat**: Integrated chat system for discussing, debugging, and brainstorming.
+- **Secure Authentication**: Create or join rooms safely with a robust authentication system.
+- **Join or Create Rooms**: Jump into existing sessions or start your own coding room with a simple room code.
+- **Multi-Language Support**: Supports popular programming languages like JavaScript, Python, and more—no setup required.
+- **Auto-Save & Sync**: Never lose progress; code syncs across devices in real-time.
 
 ## Getting Started
 
