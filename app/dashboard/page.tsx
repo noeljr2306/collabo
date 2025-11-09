@@ -34,81 +34,99 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Code2 className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-bold">Collabo</h1>
-          </div>
-          <Button variant="ghost" size="sm">
-            Sign Out
-          </Button>
+    <div className="min-h-screen bg-slate-950">
+      <div className="container bg-emerald-950/25 backdrop-blur-2xl mx-auto px-4 py-4 fixed flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Code2 className="h-6 w-6 text-emerald-400" />
+          <h1 className="text-xl font-bold text-slate-50">Collabo</h1>
         </div>
-      </header>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-slate-400 hover:text-slate-50"
+        >
+          Sign Out
+        </Button>
+      </div>
 
-      <main className="container mx-auto px-4 py-12 max-w-6xl">
+      <main className="container mx-auto px-4 py-22 max-w-6xl">
         <div className="mb-12 space-y-2">
-          <h2 className="text-4xl font-bold text-foreground">Welcome back!</h2>
-          <p className="text-lg text-muted-foreground">
+          <h2 className="text-5xl font-bold text-slate-50">Welcome back!</h2>
+          <p className="text-lg text-slate-400">
             Start collaborating on code in real-time
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-12">
-          <Card className="border-border shadow-lg hover:shadow-xl transition-shadow">
+          <Card className="bg-slate-900/50 border-slate-800 shadow-xl rounded-2xl hover:shadow-2xl transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Plus className="h-5 w-5 text-primary" />
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <Plus className="h-5 w-5 text-emerald-400" />
                 </div>
-                <CardTitle>Create Room</CardTitle>
+                <CardTitle className="text-slate-50">Create Room</CardTitle>
               </div>
-              <CardDescription>
+              <CardDescription className="text-slate-400">
                 Start a new collaboration session
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="room-name">Room Name</Label>
+                  <Label
+                    htmlFor="room-name"
+                    className="text-sm font-medium text-slate-50"
+                  >
+                    Room Name
+                  </Label>
                   <Input
                     id="room-name"
                     placeholder="My Awesome Project"
-                    className="rounded-lg"
+                    className="rounded-lg focus-visible:ring-emerald-500 bg-slate-800 border-slate-700 text-slate-50"
                   />
                 </div>
-                <Button type="submit" className="w-full rounded-lg" asChild>
+                <Button
+                  type="submit"
+                  className="w-full rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-base font-semibold shadow-md transition-all"
+                  asChild
+                >
                   <Link href="/room/new-room">Create Room</Link>
                 </Button>
               </form>
             </CardContent>
           </Card>
 
-          <Card className="border-border shadow-lg hover:shadow-xl transition-shadow">
+          <Card className="bg-slate-900/50 border-slate-800 shadow-xl rounded-2xl hover:shadow-2xl transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Users className="h-5 w-5 text-primary" />
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <Users className="h-5 w-5 text-emerald-400" />
                 </div>
-                <CardTitle>Join Room</CardTitle>
+                <CardTitle className="text-slate-50">Join Room</CardTitle>
               </div>
-              <CardDescription>Enter a room code to join</CardDescription>
+              <CardDescription className="text-slate-400">
+                Enter a room code to join
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <form className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="room-code">Room Code</Label>
+                  <Label
+                    htmlFor="room-code"
+                    className="text-sm font-medium text-slate-50"
+                  >
+                    Room Code
+                  </Label>
                   <Input
                     id="room-code"
                     placeholder="ABC123"
-                    className="rounded-lg uppercase"
+                    className="rounded-lg focus-visible:ring-emerald-500 bg-slate-800 border-slate-700 text-slate-50 uppercase"
                   />
                 </div>
                 <Button
                   type="submit"
                   variant="outline"
-                  className="w-full rounded-lg bg-transparent"
+                  className="w-full rounded-lg bg-transparent border-slate-700 text-slate-50 hover:bg-slate-800 hover:text-slate-50"
                 >
                   Join Room
                 </Button>
@@ -117,20 +135,20 @@ export default function DashboardPage() {
           </Card>
         </div>
         <div className="space-y-6">
-          <h3 className="text-2xl font-bold text-foreground">Recent Rooms</h3>
+          <h3 className="text-2xl font-bold text-slate-50">Recent Rooms</h3>
           <div className="grid gap-4">
             {recentRooms.map((room) => (
               <Card
                 key={room.id}
-                className="border-border hover:border-primary/50 transition-colors cursor-pointer"
+                className="bg-slate-900/50 border-slate-800 hover:border-emerald-500/50 transition-colors cursor-pointer rounded-2xl"
               >
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <h4 className="text-lg font-semibold text-foreground">
+                      <h4 className="text-lg font-semibold text-slate-50">
                         {room.name}
                       </h4>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-4 text-sm text-slate-400">
                         <span className="flex items-center gap-1">
                           <Users className="h-4 w-4" />
                           {room.participants}{" "}
@@ -141,7 +159,10 @@ export default function DashboardPage() {
                         <span>Last active {room.lastActive}</span>
                       </div>
                     </div>
-                    <Button asChild className="rounded-lg">
+                    <Button
+                      asChild
+                      className="rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-base font-semibold shadow-md transition-all"
+                    >
                       <Link href={`/room/${room.id}`}>Open</Link>
                     </Button>
                   </div>

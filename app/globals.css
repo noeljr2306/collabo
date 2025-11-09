@@ -120,3 +120,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .why-choose-item {
+    @apply flex gap-5 p-6 rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-emerald-500/30 hover:scale-105 transition-all;
+  }
+}
