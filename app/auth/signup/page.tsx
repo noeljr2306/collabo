@@ -40,7 +40,7 @@ export default function SignUpPage() {
             </div>
 
             <CardTitle className="text-3xl font-bold text-slate-50">
-              Create your Collabo Account
+              Create your Account
             </CardTitle>
 
             <CardDescription className="text-slate-400">

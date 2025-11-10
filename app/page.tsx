@@ -15,6 +15,7 @@ import {
   Palette,
   Handshake,
   Sparkles,
+  Github,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -79,6 +80,28 @@ export default function LandingPage() {
         `,
         }}
       />
+
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                <span className="text-slate-950 font-bold text-lg">C</span>
+              </div>
+              <span className="text-xl font-bold text-slate-50">Collabo</span>
+            </div>
+            
+            
+             <a href="https://github.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-emerald-400 transition-colors"
+            >
+              <Github className="w-6 h-6" />
+            </a>
+          </div>
+        </div>
+      </nav>
 
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-linear-to-b from-emerald-500/5 to-transparent pointer-events-none" />
