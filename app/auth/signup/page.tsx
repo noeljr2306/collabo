@@ -1,12 +1,10 @@
 "use client";
 
-import type React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import FormField from "@/components/form-field";
 import {
   Card,
   CardContent,
@@ -40,9 +38,11 @@ export default function SignUpPage() {
                 C
               </div>
             </div>
+
             <CardTitle className="text-3xl font-bold text-slate-50">
               Create your Collabo Account
             </CardTitle>
+
             <CardDescription className="text-slate-400">
               Join{" "}
               <span className="font-semibold text-emerald-400">Collabo</span>{" "}
@@ -52,65 +52,38 @@ export default function SignUpPage() {
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label
-                  htmlFor="username"
-                  className="text-sm font-medium text-slate-50"
-                >
-                  Username
-                </Label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="e.g. collaboDev"
-                  className="rounded-lg focus-visible:ring-emerald-500 bg-slate-800 border-slate-700 text-slate-50"
-                  value={formData.username}
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
-                  required
-                />
-              </div>
+              <FormField
+                id="username"
+                label="Username"
+                type="text"
+                placeholder="e.g. collaboDev"
+                value={formData.username}
+                onChange={(e) =>
+                  setFormData({ ...formData, username: e.target.value })
+                }
+              />
 
-              <div className="space-y-2">
-                <Label
-                  htmlFor="email"
-                  className="text-sm font-medium text-slate-50"
-                >
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  className="rounded-lg focus-visible:ring-emerald-500 bg-slate-800 border-slate-700 text-slate-50"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  required
-                />
-              </div>
+              <FormField
+                id="email"
+                label="Email"
+                type="email"
+                placeholder="you@example.com"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+              />
 
-              <div className="space-y-2">
-                <Label
-                  htmlFor="password"
-                  className="text-sm font-medium text-slate-50"
-                >
-                  Password
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  className="rounded-lg focus-visible:ring-emerald-500 bg-slate-800 border-slate-700 text-slate-50"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  required
-                />
-              </div>
+              <FormField
+                id="password"
+                label="Password"
+                type="password"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+              />
 
               <Button
                 type="submit"
