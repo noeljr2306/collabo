@@ -1,90 +1,113 @@
-"use client"
+"use client";
 
-import { useEffect, useRef } from "react"
-import { Terminal } from "xterm"
-import { FitAddon } from "xterm-addon-fit"
-import "xterm/css/xterm.css"
+import { useEffect, useRef } from "react";
+import { Terminal } from "xterm";
+import { FitAddon } from "xterm-addon-fit";
+import "xterm/css/xterm.css";
+import { getWebContainer } from "@/lib/webcontainer";
 
-export function TerminalPanel() {
-  const terminalRef = useRef<HTMLDivElement | null>(null)
-  const fitAddon = useRef(new FitAddon())
+/**
+ * Minimal xterm + WebContainer terminal panel.
+ *
+ * Goals:
+ * - Keep a single terminal + process per mount.
+ * - Make input piping robust and clean up resources on unmount.
+ * - Stay simple and readable for the MVP.
+ */
+export default function TerminalPanel() {
+  const terminalRef = useRef<HTMLDivElement>(null);
+
+  // Track the active WebContainer process and writer so we can clean them up.
+  const processRef = useRef<any | null>(null);
+  const writerRef = useRef<WritableStreamDefaultWriter<string> | null>(null);
+
+  // We keep connectTerminal inside the component but outside useEffect so the logic
+  // is clear and testable, while still only being called once by the effect.
+  async function connectTerminal(terminal: Terminal) {
+    try {
+      const wc = await getWebContainer();
+
+      const process = await wc.spawn("jsh", {
+        terminal: {
+          cols: terminal.cols,
+          rows: terminal.rows,
+        },
+      });
+
+      processRef.current = process;
+
+      // Shell → Terminal
+      if (typeof WritableStream !== "undefined") {
+        await process.output.pipeTo(
+          new WritableStream({
+            write(data) {
+              terminal.write(data);
+            },
+          })
+        );
+      } else {
+        terminal.writeln("Your browser does not support streams.");
+      }
+
+      // Terminal → Shell
+      const writer = process.input.getWriter();
+      writerRef.current = writer;
+
+      terminal.onData((data) => {
+        // If the process has exited for any reason, avoid writing to a closed stream.
+        if (!writerRef.current) return;
+        writerRef.current.write(data);
+      });
+    } catch (error) {
+      console.error("Failed to start terminal process", error);
+      terminal.writeln("\r\nFailed to start shell process.\r\n");
+    }
+  }
 
   useEffect(() => {
-    if (!terminalRef.current) return
+    if (!terminalRef.current) return;
 
-    const term = new Terminal({
+    const terminal = new Terminal({
+      cursorBlink: true,
+      convertEol: true,
       theme: {
         background: "#1e1e1e",
         foreground: "#ffffff",
-        cursor: "#00ffb3",
-        // TypeScript fix: remove "selection"
       },
-      fontFamily: "monospace",
-      fontSize: 14,
-      cursorBlink: true,
-    })
+    });
 
-    term.loadAddon(fitAddon.current)
-    term.open(terminalRef.current)
-    fitAddon.current.fit()
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
 
-    // Simple text intro
-    term.writeln("Welcome to Collabo Terminal 🌿")
-    term.writeln("Type 'help' to see commands.")
-    term.write("\r\n$ ")
+    terminal.open(terminalRef.current);
+    fitAddon.fit();
+    terminal.focus();
 
-    // Keep track of user input manually
-    let userInput = ""
+    // Connect once for this mount.
+    void connectTerminal(terminal);
 
-    term.onKey(({ key, domEvent }) => {
-      const printable = !domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey
-
-      if (domEvent.key === "Enter") {
-        handleCommand(userInput, term)
-        userInput = ""
-        term.write("\r\n$ ")
-      } else if (domEvent.key === "Backspace") {
-        if (userInput.length > 0) {
-          userInput = userInput.slice(0, -1)
-          term.write("\b \b")
-        }
-      } else if (printable) {
-        userInput += key
-        term.write(key)
-      }
-    })
-
-    const handleResize = () => fitAddon.current.fit()
-    window.addEventListener("resize", handleResize)
+    // Clean up terminal + any active WebContainer process.
     return () => {
-      window.removeEventListener("resize", handleResize)
-      term.dispose()
-    }
-  }, [])
+      try {
+        if (writerRef.current) {
+          writerRef.current.close?.();
+          writerRef.current = null;
+        }
+        if (processRef.current) {
+          processRef.current.kill?.();
+          processRef.current = null;
+        }
+      } catch (error) {
+        console.error("Error cleaning up terminal process", error);
+      } finally {
+        terminal.dispose();
+      }
+    };
+  }, []);
 
   return (
-    <div className="h-64 w-full bg-[#1e1e1e] border-t border-[#3e3e42] rounded-t-md overflow-hidden">
+    <div className="h-48 bg-black border-t border-[#333]">
       <div ref={terminalRef} className="h-full w-full" />
     </div>
-  )
-}
-
-// Handle fake commands
-function handleCommand(command: string, term: Terminal) {
-  switch (command.trim().toLowerCase()) {
-    case "help":
-      term.writeln("\r\nAvailable commands:")
-      term.writeln("  help - show available commands")
-      term.writeln("  clear - clear terminal")
-      term.writeln("  about - show about info")
-      break
-    case "clear":
-      term.clear()
-      break
-    case "about":
-      term.writeln("\r\n🌿 Collabo Terminal v1.0 — Real-time code collaboration system")
-      break
-    default:
-      term.writeln(`\r\nCommand not found: ${command}`)
-  }
+  );
 }

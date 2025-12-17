@@ -1,68 +1,93 @@
+// components/ChatModal.tsx
 "use client";
-
 import { useState } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useUser } from "@clerk/nextjs";
+import { Send } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 
-interface ChatPanelProps {
+interface ChatModalProps {
+  roomId: string;
   isOpen: boolean;
-  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
-  const [messages, setMessages] = useState<{ sender: string; text: string }[]>(
-    []
-  );
-  const [message, setMessage] = useState("");
+export default function ChatModal({ roomId, isOpen, onOpenChange }: ChatModalProps) {
+  const { user } = useUser();
+  const messages = useQuery(api.message.list, { roomId }) || [];
+  const sendMessage = useMutation(api.message.send);
+  const [input, setInput] = useState("");
 
-  const sendMessage = () => {
-    if (!message.trim()) return;
-    setMessages([...messages, { sender: "You", text: message }]);
-    setMessage("");
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || !user) return;
+
+    await sendMessage({
+      roomId,
+      body: input,
+      userName: user.fullName || user.username || "Anonymous",
+    });
+    setInput("");
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent
-        side="right"
-        className="bg-[#252526] border-l border-[#3e3e42] text-white w-[320px] p-0"
-      >
-        <SheetHeader className="p-4 border-b border-[#3e3e42]">
-          <SheetTitle>Room Chat</SheetTitle>
-        </SheetHeader>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-slate-900 border-slate-800 text-slate-50 sm:max-w-[425px] h-[500px] flex flex-col">
+        <DialogHeader className="border-b border-slate-800 pb-4">
+          <DialogTitle>Room Chat</DialogTitle>
+        </DialogHeader>
 
-        <ScrollArea className="flex-1 p-4 h-[calc(100vh-180px)]">
-          <div className="space-y-3">
-            {messages.map((msg, i) => (
-              <div key={i}>
-                <p className="text-sm text-muted-foreground font-semibold">
-                  {msg.sender}
-                </p>
-                <p className="text-sm">{msg.text}</p>
-                <Separator className="my-2 opacity-20" />
+        {/* Messages List */}
+        <div className="flex-1 overflow-y-auto py-4 space-y-4 flex flex-col-reverse">
+          {messages.map((msg: {
+            _id: string;
+            userId: string;
+            userName: string;
+            body: string;
+          }) => (
+            <div
+              key={msg._id}
+              className={`flex flex-col ${msg.userId === user?.id ? "items-end" : "items-start"}`}
+            >
+              <span className="text-[10px] text-slate-500 mb-1">
+                {msg.userName}
+              </span>
+              <div
+                className={`px-3 py-2 rounded-lg max-w-[80%] text-sm ${
+                  msg.userId === user?.id
+                    ? "bg-emerald-600 text-white"
+                    : "bg-slate-800 text-slate-200"
+                }`}
+              >
+                {msg.body}
               </div>
-            ))}
-          </div>
-        </ScrollArea>
-
-        <div className="p-4 border-t border-[#3e3e42] flex gap-2">
-          <Input
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type your message..."
-            className="bg-[#1e1e1e] border-none text-white placeholder:text-gray-400"
-          />
-          <Button onClick={sendMessage}>Send</Button>
+            </div>
+          ))}
         </div>
-      </SheetContent>
-    </Sheet>
+
+        {/* Input Form */}
+        <form
+          onSubmit={handleSend}
+          className="pt-4 border-t border-slate-800 flex gap-2"
+        >
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type a message..."
+            className="bg-slate-800 border-slate-700"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            className="bg-emerald-500 hover:bg-emerald-400 text-slate-950"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

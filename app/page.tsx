@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Heart,
   MessageSquare,
   Brain,
   Lock,
@@ -22,7 +21,6 @@ import {
   floatingAvatars,
   features,
   whyChooseItems,
-  footerLinks,
 } from "@/constants";
 
 interface FloatingAvatarProps {
@@ -85,10 +83,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-                <span className="text-slate-950 font-bold text-lg">C</span>
-              </div>
-              <span className="text-xl font-bold text-slate-50">Collabo</span>
+              <span className="text-2xl font-bold text-emerald-400">Collabo</span>
             </div>
             
             
@@ -286,22 +281,8 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center space-y-5">
             <p className="text-slate-400 flex items-center justify-center gap-2 text-sm">
-              Made with{" "}
-              <Heart className="w-4 h-4 text-red-500 fill-red-500 animate-pulse" />{" "}
-              and way too much caffeine by the Collabo team.
+              Made by Noel Jr.
             </p>
-            <div className="flex items-center justify-center gap-6 text-sm flex-wrap">
-              {footerLinks.map((link, index) => (
-                <React.Fragment key={link}>
-                  <button className="text-slate-400 hover:text-emerald-400 transition-colors font-medium">
-                    {link}
-                  </button>
-                  {index < footerLinks.length - 1 && (
-                    <span className="text-slate-700">•</span>
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
             <p className="text-slate-600 text-xs pt-4">
               © 2025 Collabo. All rights reserved.
             </p>

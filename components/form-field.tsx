@@ -26,7 +26,7 @@ function FormField({
         id={id}
         type={type}
         placeholder={placeholder}
-        className="rounded-lg focus-visible:ring-emerald-500 focus:bg-transparent bg-slate-800 border-slate-700 text-slate-50"
+        className="rounded-lg focus-visible:ring-emerald-500 focus:bg-slate-800 bg-slate-800 border-slate-700 text-slate-50"
         value={value}
         onChange={onChange}
         required

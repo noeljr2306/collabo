@@ -1,91 +1,116 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useState } from "react";
+import Header from "@/components/header";
 import { Button } from "@/components/ui/button";
-import { ChatPanel } from "@/components/chat-panel";
-import { ParticipantsSidebar } from "@/components/participants-sidebar";
-import { Code2, Copy, MessageSquare, ArrowLeft } from "lucide-react";
+import { useMutation } from "convex/react";
+import { useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
+import ChatModal from "@/components/chat-panel";
+import EditorContainer from "@/components/code-editor";
 
 export default function RoomPage() {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const roomCode = "ABC123";
+  // 🔹 ROUTING
+  const params = useParams();
+  const router = useRouter();
+  const roomCode = params.id as string;
 
-  const copyRoomCode = () => {
-    navigator.clipboard.writeText(roomCode);
-  };
+  // 🔹 DATA (HOOKS MUST BE FIRST)
+  const rawRoom = useQuery(api.room.getByCode, { code: roomCode });
+  const activeUsers = useQuery(api.presence.list, { roomId: roomCode }) || [];
+  const updatePresence = useMutation(api.presence.update);
+
+  // 🔹 UI STATE
+  const [copied, setCopied] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const { user } = useUser();
 
   useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
+    if (!roomCode || !user) return;
 
-    const handleMessage = (event: MessageEvent) => {
-      console.log("Message from VSCode:", event.data);
-    };
+    // Use the name from Clerk (fallback to "Anonymous" if not set)
+    const name = user.fullName || user.username || "Anonymous";
 
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
+    // Initial heartbeat
+    updatePresence({ roomId: roomCode, userName: name });
+
+    const interval = setInterval(() => {
+      updatePresence({ roomId: roomCode, userName: name });
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [roomCode, user, updatePresence]);
+  // 🔹 LOADING STATE
+  if (rawRoom === undefined) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-emerald-400 animate-pulse font-mono">
+          Initializing session...
+        </div>
+      </div>
+    );
+  }
+
+  // 🔹 NOT FOUND
+  if (rawRoom === null) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-50">
+        <h1 className="text-xl font-bold">Room not found</h1>
+        <Button onClick={() => router.push("/dashboard")} className="mt-4">
+          Back to Dashboard
+        </Button>
+      </div>
+    );
+  }
+
+  // 🔹 SAFE ROOM OBJECT
+  const room = {
+    ...rawRoom,
+    content: rawRoom.content ?? "// Happy Coding!",
+    language: rawRoom.language ?? "javascript",
+  };
+
+  // 🔹 HANDLERS
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(roomCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
 
   return (
-    <div className="h-screen flex flex-col bg-[#1e1e1e] text-white">
-      <header className="bg-[#252526] border-b border-[#3e3e42] px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild className="h-9 w-9">
-            <Link href="/dashboard">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div className="flex items-center gap-2">
-            <Code2 className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-bold">VSCode Room</h1>
-          </div>
-        </div>
+    <div className="h-screen flex flex-col bg-slate-950 overflow-hidden">
+      <Header
+        roomName={room.name}
+        roomCode={room.code}
+        onCopyCode={handleCopyCode}
+        copied={copied}
+        onToggleFullscreen={toggleFullscreen}
+        isFullscreen={isFullscreen}
+        onToggleChat={() => setIsChatOpen(true)}
+        isChatOpen={isChatOpen}
+        activeUsers={activeUsers}
+      />
 
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg">
-            <span className="text-sm text-muted-foreground">Room Code:</span>
-            <span className="text-sm font-mono font-semibold">{roomCode}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={copyRoomCode}
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9"
-            onClick={copyRoomCode}
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-9 w-9">
-            <MessageSquare className="h-4 w-4" />
-          </Button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* VSCode Web iframe */}
-        <div className="flex-1 p-2 overflow-hidden rounded-lg">
-          <iframe
-            ref={iframeRef}
-            src="https://vscode.dev/"
-            className="w-full h-full rounded-lg border border-[#3e3e42]"
-          ></iframe>
-        </div>
-
-        {/* Participants Sidebar */}
-        <ParticipantsSidebar />
-
-        {/* Chat Panel */}
-        <ChatPanel isOpen={false} onClose={() => {}} />
-      </div>
+      <EditorContainer room={room} />
+      <ChatModal
+        roomId={roomCode}
+        isOpen={isChatOpen}
+        onOpenChange={setIsChatOpen}
+      />
     </div>
   );
 }
