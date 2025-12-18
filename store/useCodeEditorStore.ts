@@ -1,7 +1,7 @@
-import { CodeEditorState } from "../types/index";
-import { LANGUAGE_CONFIG } from "@/constants";
 import { create } from "zustand";
-import { editor as MonacoEditor } from "monaco-editor";
+import { type editor } from "monaco-editor"; // 1. Fixed Import
+import { LANGUAGE_CONFIG } from "@/constants";
+import { CodeEditorState } from "../types/index";
 
 const getInitialState = () => {
   // If we're on the server, return default values only.
@@ -38,31 +38,29 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
 
     getCode: () => get().editor?.getValue() || "",
 
-    setEditor: (editor: MonacoEditor.IStandaloneCodeEditor) => {
+    // 2. Fixed Type Definition here
+    setEditor: (editorInstance: editor.IStandaloneCodeEditor) => {
       const language = get().language;
       const savedCode = localStorage.getItem(`editor-code-${language}`);
-      if (savedCode) editor.setValue(savedCode);
+      if (savedCode) editorInstance.setValue(savedCode);
 
       // Prepare a single debounced change pipeline where Convex sync will plug in.
-      // This avoids keystroke-by-keystroke updates while keeping the logic simple.
       let saveTimeout: number | null = null;
 
-      editor.onDidChangeModelContent(() => {
-        const code = editor.getValue();
+      editorInstance.onDidChangeModelContent(() => {
+        const code = editorInstance.getValue();
 
         if (saveTimeout) {
           window.clearTimeout(saveTimeout);
         }
 
         saveTimeout = window.setTimeout(() => {
-          // For now, we persist locally. This is where a Convex mutation
-          // (e.g. `updateFile` for the current room/file) can be called.
           localStorage.setItem(`editor-code-${get().language}`, code);
           // TODO: call Convex mutation here to sync code for the active room/file.
         }, 500);
       });
 
-      set({ editor });
+      set({ editor: editorInstance });
     },
 
     setTheme: (theme: string) => {
@@ -76,7 +74,6 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
     },
 
     setLanguage: (language: string) => {
-      // Save current language code before switching.
       const currentCode = get().editor?.getValue();
       if (currentCode) {
         localStorage.setItem(`editor-code-${get().language}`, currentCode);
@@ -120,7 +117,7 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
 
         console.log("data back from piston:", data);
 
-        // handle API-level erros
+        // handle API-level errors
         if (data.message) {
           set({
             error: data.message,
