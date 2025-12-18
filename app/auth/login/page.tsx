@@ -1,18 +1,14 @@
 "use client";
 
 import { SignIn } from "@clerk/nextjs";
-import { Terminal } from "lucide-react";
 
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
       {/* Logo / Brand Header */}
       <div className="flex items-center gap-3 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-        <div className="bg-emerald-500 p-2 rounded-xl">
-          <Terminal className="h-8 w-8 text-slate-950" />
-        </div>
         <h1 className="text-2xl font-bold text-white tracking-tight">
-          DevSync <span className="text-emerald-500">Live</span>
+          Collabo
         </h1>
       </div>
 
