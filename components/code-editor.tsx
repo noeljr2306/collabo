@@ -161,7 +161,6 @@ export default function EditorContainer({ room }: { room: any }) {
               lineNumbers: "on",
               roundedSelection: true,
               cursorBlinking: "smooth",
-              cursorSmoothCaretAnimation: true,
               smoothScrolling: true,
               renderWhitespace: "boundary",
               renderLineHighlight: "line",
