@@ -6,7 +6,7 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     userId: v.string(),
-    isPro: v.boolean(), // ✅ add this
+    isPro: v.boolean(),
   }).index("byUserId", ["userId"]),
 
   codeExecutions: defineTable({
@@ -22,24 +22,37 @@ export default defineSchema({
     code: v.string(),
     hostId: v.string(),
     createdAt: v.float64(),
+    // kept as optional for backwards compatibility with existing rooms
     content: v.optional(v.string()),
-    // Change this from v.string() to v.optional(v.string())
     language: v.optional(v.string()),
   }).index("by_code", ["code"]),
 
+  // Each file belongs to a room
+  files: defineTable({
+    roomId: v.string(), // The 6-char room code
+    name: v.string(), // e.g. "main.java", "index.html"
+    content: v.string(), // File content
+    language: v.string(), // monaco language id e.g. "java", "javascript"
+    isFolder: v.boolean(), // true = folder, false = file
+    parentId: v.optional(v.string()), // parent file/folder id (null = root)
+    createdAt: v.float64(),
+    updatedAt: v.float64(),
+  })
+    .index("by_room", ["roomId"])
+    .index("by_room_parent", ["roomId", "parentId"]),
+
   presence: defineTable({
-    roomId: v.string(), // The 6-char room code or room ID
-    userId: v.string(), // User's unique ID
+    roomId: v.string(),
+    userId: v.string(),
     userName: v.string(),
-    lastSeen: v.number(), // Timestamp
+    lastSeen: v.number(),
   }).index("by_room", ["roomId"]),
 
-  // convex/schema.ts
   messages: defineTable({
-    roomId: v.string(), // The 6-char room code
-    userId: v.string(), // Clerk user ID
-    userName: v.string(), // Sender's name
-    body: v.string(), // Message content
-    createdAt: v.number(), // Timestamp
+    roomId: v.string(),
+    userId: v.string(),
+    userName: v.string(),
+    body: v.string(),
+    createdAt: v.number(),
   }).index("by_room", ["roomId"]),
 });

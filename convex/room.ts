@@ -1,29 +1,26 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-// 1. Mutation to create a room
+// ─── ROOM MUTATIONS ──────────────────────────────────────────────────────────
+
 export const create = mutation({
   args: { name: v.string() },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthenticated");
 
-    // Generate a unique 6-character code
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let roomCode = "";
 
-    // Simple collision check: loop until we find a code that doesn't exist
     while (true) {
       roomCode = "";
       for (let i = 0; i < 6; i++) {
         roomCode += chars.charAt(Math.floor(Math.random() * chars.length));
       }
-
       const existing = await ctx.db
         .query("rooms")
         .withIndex("by_code", (q) => q.eq("code", roomCode))
         .unique();
-
       if (!existing) break;
     }
 
@@ -31,25 +28,30 @@ export const create = mutation({
       name: args.name,
       code: roomCode,
       hostId: identity.subject,
-      language: "javascript", // Add this default
-      content: "// Start coding...", // Add this default
       createdAt: Date.now(),
+    });
+
+    // Seed with a default welcome file
+    await ctx.db.insert("files", {
+      roomId: roomCode,
+      name: "index.js",
+      content: "// Welcome to Collabo!\n// Start coding together.\n\nconsole.log('Hello, World!');\n",
+      language: "javascript",
+      isFolder: false,
+      parentId: undefined,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
 
     return { roomId, roomCode };
   },
 });
 
-// 2. Query to fetch rooms for the dashboard (Fixes the "Could not find" error)
 export const getRecent = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-
-    // If not logged in, return empty array instead of crashing
     if (!identity) return [];
-
-    // Fetch rooms where the current user is the host
     return await ctx.db
       .query("rooms")
       .filter((q) => q.eq(q.field("hostId"), identity.subject))
@@ -66,24 +68,108 @@ export const getByCode = query({
       .unique();
   },
 });
-// convex/rooms.ts
 
-export const updateContent = mutation({
-  args: {
-    id: v.id("rooms"),
-    content: v.string(),
-  },
+// ─── FILE QUERIES ─────────────────────────────────────────────────────────────
+
+export const getFiles = query({
+  args: { roomId: v.string() },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.id, { content: args.content });
+    return await ctx.db
+      .query("files")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .collect();
   },
 });
 
-export const updateLanguage = mutation({
+export const getFileContent = query({
+  args: { fileId: v.id("files") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.fileId);
+  },
+});
+
+// ─── FILE MUTATIONS ───────────────────────────────────────────────────────────
+
+export const createFile = mutation({
   args: {
-    id: v.id("rooms"),
+    roomId: v.string(),
+    name: v.string(),
+    language: v.string(),
+    isFolder: v.boolean(),
+    parentId: v.optional(v.string()),
+    content: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const fileId = await ctx.db.insert("files", {
+      roomId: args.roomId,
+      name: args.name,
+      language: args.language,
+      isFolder: args.isFolder,
+      parentId: args.parentId,
+      content: args.content ?? "",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    return fileId;
+  },
+});
+
+export const updateFileContent = mutation({
+  args: {
+    fileId: v.id("files"),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.fileId, {
+      content: args.content,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const renameFile = mutation({
+  args: {
+    fileId: v.id("files"),
+    name: v.string(),
     language: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.id, { language: args.language });
+    await ctx.db.patch(args.fileId, {
+      name: args.name,
+      language: args.language,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const deleteFile = mutation({
+  args: { fileId: v.id("files") },
+  handler: async (ctx, args) => {
+    // Also delete all children if it's a folder
+    const children = await ctx.db
+      .query("files")
+      .withIndex("by_room_parent", (q) =>
+        q.eq("roomId", "").eq("parentId", args.fileId)
+      )
+      .collect();
+
+    for (const child of children) {
+      await ctx.db.delete(child._id);
+    }
+
+    await ctx.db.delete(args.fileId);
+  },
+});
+
+export const deleteFilesByRoom = mutation({
+  args: { roomId: v.string() },
+  handler: async (ctx, args) => {
+    const files = await ctx.db
+      .query("files")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .collect();
+    for (const file of files) {
+      await ctx.db.delete(file._id);
+    }
   },
 });

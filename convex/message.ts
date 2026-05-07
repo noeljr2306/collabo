@@ -1,9 +1,13 @@
-// convex/messages.ts
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
 export const send = mutation({
-  args: { roomId: v.string(), body: v.string(), userName: v.string() },
+  args: {
+    roomId: v.string(),
+    body: v.string(),
+    userName: v.string(),
+    userId: v.string(), // ← added: chat-panel passes this explicitly
+  },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthenticated");
@@ -11,7 +15,7 @@ export const send = mutation({
     await ctx.db.insert("messages", {
       roomId: args.roomId,
       body: args.body,
-      userId: identity.subject,
+      userId: args.userId,
       userName: args.userName,
       createdAt: Date.now(),
     });
@@ -24,7 +28,7 @@ export const list = query({
     return await ctx.db
       .query("messages")
       .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
-      .order("desc") // Get newest messages first
-      .take(50); // Limit to last 50 for MVP
+      .order("asc") // ← fixed: oldest first so chat reads top→bottom
+      .take(50);
   },
 });

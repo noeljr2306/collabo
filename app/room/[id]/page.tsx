@@ -1,80 +1,59 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useState } from "react";
-import Header from "@/components/header";
-import { Button } from "@/components/ui/button";
-import { useMutation } from "convex/react";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import ChatModal from "@/components/chat-panel";
-import EditorContainer from "@/components/code-editor";
+import { Button } from "@/components/ui/button";
+import Header from "@/components/header";
+import IDEShell from "@/components/ide/IDEShell";
 
 export default function RoomPage() {
-  // 🔹 ROUTING
   const params = useParams();
   const router = useRouter();
   const roomCode = params.id as string;
 
-  // 🔹 DATA (HOOKS MUST BE FIRST)
   const rawRoom = useQuery(api.room.getByCode, { code: roomCode });
-  const activeUsers = useQuery(api.presence.list, { roomId: roomCode }) || [];
+  const activeUsers = useQuery(api.presence.list, { roomId: roomCode }) ?? [];
   const updatePresence = useMutation(api.presence.update);
 
-  // 🔹 UI STATE
-  const [copied, setCopied] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const { user } = useUser();
+  const [copied, setCopied] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Heartbeat presence
   useEffect(() => {
     if (!roomCode || !user) return;
-
-    // Use the name from Clerk (fallback to "Anonymous" if not set)
     const name = user.fullName || user.username || "Anonymous";
-
-    // Initial heartbeat
     updatePresence({ roomId: roomCode, userName: name });
-
     const interval = setInterval(() => {
       updatePresence({ roomId: roomCode, userName: name });
     }, 5000);
-
     return () => clearInterval(interval);
   }, [roomCode, user, updatePresence]);
-  // 🔹 LOADING STATE
+
   if (rawRoom === undefined) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-emerald-400 animate-pulse font-mono">
+      <div className="min-h-screen bg-[#1e1e1e] flex items-center justify-center">
+        <div className="text-[#007acc] animate-pulse font-mono text-sm">
           Initializing session...
         </div>
       </div>
     );
   }
 
-  // 🔹 NOT FOUND
   if (rawRoom === null) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-50">
-        <h1 className="text-xl font-bold">Room not found</h1>
-        <Button onClick={() => router.push("/dashboard")} className="mt-4">
+      <div className="min-h-screen bg-[#1e1e1e] flex flex-col items-center justify-center text-[#ccc]">
+        <h1 className="text-xl font-bold mb-4">Room not found</h1>
+        <Button onClick={() => router.push("/dashboard")}>
           Back to Dashboard
         </Button>
       </div>
     );
   }
 
-  // 🔹 SAFE ROOM OBJECT
-  const room = {
-    ...rawRoom,
-    content: rawRoom.content ?? "// Happy Coding!",
-    language: rawRoom.language ?? "javascript",
-  };
-
-  // 🔹 HANDLERS
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode);
     setCopied(true);
@@ -92,25 +71,23 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950 overflow-hidden">
+    <div className="h-screen flex flex-col bg-[#1e1e1e] overflow-hidden">
       <Header
-        roomName={room.name}
-        roomCode={room.code}
+        roomName={rawRoom.name}
+        roomCode={rawRoom.code}
         onCopyCode={handleCopyCode}
         copied={copied}
         onToggleFullscreen={toggleFullscreen}
         isFullscreen={isFullscreen}
-        onToggleChat={() => setIsChatOpen(true)}
-        isChatOpen={isChatOpen}
+        onToggleChat={() => {}} // Chat is now inside the IDE sidebar
+        isChatOpen={false}
         activeUsers={activeUsers}
       />
 
-      <EditorContainer room={room} />
-      <ChatModal
-        roomId={roomCode}
-        isOpen={isChatOpen}
-        onOpenChange={setIsChatOpen}
-      />
+      {/* Full IDE */}
+      <div className="flex-1 overflow-hidden">
+        <IDEShell room={rawRoom} activeUsers={activeUsers} />
+      </div>
     </div>
   );
 }
