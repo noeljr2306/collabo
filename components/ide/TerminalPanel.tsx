@@ -5,13 +5,12 @@ import { X, Plus, Terminal as TerminalIcon, Loader2 } from "lucide-react";
 import { getWebContainer } from "@/lib/webcontainer";
 
 interface TerminalPanelProps {
-  roomId: string;
   onClose: () => void;
 }
 
 interface TermTab { id: number; }
 
-export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
+export default function TerminalPanel({  onClose }: TerminalPanelProps) {
   const [tabs, setTabs] = useState<TermTab[]>([{ id: 1 }]);
   const [activeTab, setActiveTab] = useState(1);
   const [status, setStatus] = useState<"booting" | "ready" | "error">("booting");

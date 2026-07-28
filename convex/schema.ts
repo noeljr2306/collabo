@@ -22,30 +22,47 @@ export default defineSchema({
     code: v.string(),
     hostId: v.string(),
     createdAt: v.float64(),
-    // kept as optional for backwards compatibility with existing rooms
     content: v.optional(v.string()),
     language: v.optional(v.string()),
   }).index("by_code", ["code"]),
 
-  // Each file belongs to a room
   files: defineTable({
-    roomId: v.string(), // The 6-char room code
-    name: v.string(), // e.g. "main.java", "index.html"
-    content: v.string(), // File content
-    language: v.string(), // monaco language id e.g. "java", "javascript"
-    isFolder: v.boolean(), // true = folder, false = file
-    parentId: v.optional(v.string()), // parent file/folder id (null = root)
+    roomId: v.string(),
+    name: v.string(),
+    content: v.string(),
+    language: v.string(),
+    isFolder: v.boolean(),
+    parentId: v.optional(v.string()),
     createdAt: v.float64(),
     updatedAt: v.float64(),
   })
     .index("by_room", ["roomId"])
     .index("by_room_parent", ["roomId", "parentId"]),
 
+  // Enhanced presence with cursor + selection data
   presence: defineTable({
     roomId: v.string(),
     userId: v.string(),
     userName: v.string(),
     lastSeen: v.number(),
+    color: v.optional(v.string()),
+    isTyping: v.optional(v.boolean()),
+    cursor: v.optional(
+      v.object({
+        fileId: v.string(),
+        line: v.number(),
+        column: v.number(),
+      }),
+    ),
+    selection: v.optional(
+      v.object({
+        fileId: v.string(),
+        startLine: v.number(),
+        startColumn: v.number(),
+        endLine: v.number(),
+        endColumn: v.number(),
+      }),
+    ),
   }).index("by_room", ["roomId"]),
 
   messages: defineTable({
