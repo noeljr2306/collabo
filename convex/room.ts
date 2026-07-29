@@ -127,6 +127,30 @@ export const updateFileContent = mutation({
   },
 });
 
+export const updateContent = mutation({
+  args: {
+    id: v.id("rooms"),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      content: args.content,
+    });
+  },
+});
+
+export const updateLanguage = mutation({
+  args: {
+    id: v.id("rooms"),
+    language: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      language: args.language,
+    });
+  },
+});
+
 export const renameFile = mutation({
   args: {
     fileId: v.id("files"),

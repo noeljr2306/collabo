@@ -162,7 +162,10 @@ export default function IDEShell({ room, activeUsers }: IDEShellProps) {
                   snap
                 >
                   <div style={{ height: "100%", overflow: "hidden" }}>
-                    <TerminalPanel onClose={() => setTerminalOpen(false)} />
+                    <TerminalPanel
+                      roomId={room.code}
+                      onClose={() => setTerminalOpen(false)}
+                    />
                   </div>
                 </Allotment.Pane>
               </Allotment>
