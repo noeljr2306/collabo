@@ -1,339 +1,1081 @@
 "use client";
+// app/dashboard/page.tsx
+
 import { useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation"; // Use Next.js router
-import { useMutation, useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Card, CardContent } from "@/components/ui/card";
+import { useUser, UserButton } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Code2, Plus, Users, Copy, Check } from "lucide-react";
-import { useUser, useClerk } from "@clerk/nextjs";
-import { UserButton } from "@clerk/nextjs";
+  Code2,
+  Plus,
+  Users,
+  Clock,
+  ArrowRight,
+  Copy,
+  Check,
+  Search,
+  Hash,
+  Loader2,
+  X,
+} from "lucide-react";
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const { user } = useUser();
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-  const [joinCode, setJoinCode] = useState("");
-  const [roomName, setRoomName] = useState("");
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60_000);
+  const hours = Math.floor(diff / 3_600_000);
+  const days = Math.floor(diff / 86_400_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${days}d ago`;
+}
 
-  const handleOpenCreateModal = () => {
-    setRoomName(""); // Reset the name field for a fresh start
-    setIsCreateModalOpen(true);
-  };
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-  const handleCopyCode = (text: string) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
+function CopyCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      title="Copy room code"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        background: "#1c1c1f",
+        border: "1px solid #2a2a2e",
+        borderRadius: 6,
+        padding: "3px 9px",
+        color: "#6b6b72",
+        fontSize: 11,
+        fontFamily: "'JetBrains Mono', monospace",
+        cursor: "pointer",
+        transition: "all 0.15s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "#3a3a3f";
+        e.currentTarget.style.color = "#a1a1aa";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "#2a2a2e";
+        e.currentTarget.style.color = "#6b6b72";
+      }}
+    >
+      {copied ? (
+        <Check size={10} color="#22c55e" strokeWidth={3} />
+      ) : (
+        <Copy size={10} />
+      )}
+      {code}
+    </button>
+  );
+}
 
+// ─── Create Room Modal ────────────────────────────────────────────────────────
+
+function CreateRoomModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (code: string) => void;
+}) {
   const createRoom = useMutation(api.room.create);
-  const recentRooms = useQuery(api.room.getRecent) || [];
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [generatedCode, setGeneratedCode] = useState("");
-
-  const handleCreateRoom = async () => {
-    const result = await createRoom({ name: roomName });
-    setGeneratedCode(result.roomCode);
-    // You can now show this code in the modal with a Copy button
-    // OR just redirect immediately:
-    router.push(`/room/${result.roomCode}`);
-  };
-
-  const handleJoinRoom = () => {
-    if (joinCode.length === 6) {
-      router.push(`/room/${joinCode}`);
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const { roomCode } = await createRoom({ name: name.trim() });
+      onCreated(roomCode);
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to create room. Please try again.");
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <div className="fixed top-0 left-0 right-0 bg-slate-950/50 backdrop-blur-md border-b border-slate-800 z-50">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          {/* Left Side: Logo & Title */}
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.72)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        padding: 24,
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          background: "#111113",
+          border: "1px solid #2a2a2e",
+          borderRadius: 18,
+          padding: "28px 28px 24px",
+          width: "100%",
+          maxWidth: 420,
+          boxShadow: "0 32px 80px rgba(0,0,0,0.6)",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 6,
+          }}
+        >
+          <div>
+            <h2
+              style={{
+                fontSize: 18,
+                fontWeight: 800,
+                color: "#fff",
+                letterSpacing: "-0.4px",
+              }}
+            >
+              New room
+            </h2>
+            <p style={{ fontSize: 13, color: "#6b6b72", marginTop: 2 }}>
+              A 6-character invite code is generated automatically.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#6b6b72",
+              padding: 6,
+              borderRadius: 8,
+              display: "flex",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#1c1c1f";
+              e.currentTarget.style.color = "#e4e4e7";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "none";
+              e.currentTarget.style.color = "#6b6b72";
+            }}
           >
-            <div className="bg-emerald-500/20 p-2 rounded-lg">
-              <Code2 className="h-6 w-6 text-emerald-400" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-50">
-              collabo<span className="text-emerald-400">.</span>
-            </h1>
-          </Link>
+            <X size={18} />
+          </button>
+        </div>
 
-          {/* Right Side: User Profile */}
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex flex-col items-end mr-2">
-              <span className="text-sm font-medium text-slate-200">
-                {user?.username || "Developer"}
-              </span>
-              <span className="text-xs text-slate-500">
-                {user?.primaryEmailAddress?.emailAddress}
-              </span>
-            </div>
+        {/* Divider */}
+        <div style={{ height: 1, background: "#1c1c1f", margin: "18px 0" }} />
 
-            {/* Clerk User Button handles profile pic + sign out dropdown automatically */}
-            <UserButton
-              afterSignOutUrl="/auth/login"
-              appearance={{
-                elements: {
-                  userButtonAvatarBox: "h-9 w-9 border border-emerald-500/50",
-                },
+        {/* Error */}
+        {error && (
+          <div
+            style={{
+              background: "rgba(239,68,68,0.08)",
+              border: "1px solid rgba(239,68,68,0.2)",
+              borderRadius: 10,
+              padding: "10px 14px",
+              marginBottom: 16,
+              fontSize: 13,
+              color: "#ef4444",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <form
+          onSubmit={handleCreate}
+          style={{ display: "flex", flexDirection: "column", gap: 20 }}
+        >
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#a1a1aa",
+                marginBottom: 7,
+              }}
+            >
+              Room name
+            </label>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Hackathon 2025, Sprint #3..."
+              maxLength={48}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                background: "#1c1c1f",
+                border: "1px solid #2a2a2e",
+                borderRadius: 10,
+                padding: "11px 14px",
+                color: "#e4e4e7",
+                fontSize: 14,
+                fontFamily: "system-ui, sans-serif",
+                outline: "none",
+                transition: "border-color 0.15s, box-shadow 0.15s",
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "#22c55e";
+                e.target.style.boxShadow = "0 0 0 3px rgba(34,197,94,0.12)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "#2a2a2e";
+                e.target.style.boxShadow = "none";
               }}
             />
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                background: "transparent",
+                border: "1px solid #2a2a2e",
+                borderRadius: 10,
+                padding: "10px",
+                cursor: "pointer",
+                color: "#a1a1aa",
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: "system-ui, sans-serif",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#3a3a3f";
+                e.currentTarget.style.color = "#e4e4e7";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#2a2a2e";
+                e.currentTarget.style.color = "#a1a1aa";
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!name.trim() || loading}
+              style={{
+                flex: 1,
+                background: "#22c55e",
+                color: "#000",
+                border: "none",
+                borderRadius: 10,
+                padding: "10px",
+                cursor: !name.trim() || loading ? "not-allowed" : "pointer",
+                fontSize: 14,
+                fontWeight: 700,
+                fontFamily: "system-ui, sans-serif",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                opacity: !name.trim() || loading ? 0.5 : 1,
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                if (name.trim() && !loading)
+                  e.currentTarget.style.background = "#16a34a";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#22c55e";
+              }}
+            >
+              {loading ? (
+                <>
+                  <Loader2
+                    size={14}
+                    style={{ animation: "spin 0.7s linear infinite" }}
+                  />{" "}
+                  Creating…
+                </>
+              ) : (
+                <>
+                  <Plus size={14} /> Create room
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Join Room Modal ──────────────────────────────────────────────────────────
+
+function JoinRoomModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+
+  const handleJoin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = code.trim().toUpperCase();
+    if (trimmed.length !== 6) {
+      setError("Room codes are exactly 6 characters.");
+      return;
+    }
+    router.push(`/room/${trimmed}`);
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.72)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        padding: 24,
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          background: "#111113",
+          border: "1px solid #2a2a2e",
+          borderRadius: 18,
+          padding: "28px 28px 24px",
+          width: "100%",
+          maxWidth: 380,
+          boxShadow: "0 32px 80px rgba(0,0,0,0.6)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 6,
+          }}
+        >
+          <div>
+            <h2
+              style={{
+                fontSize: 18,
+                fontWeight: 800,
+                color: "#fff",
+                letterSpacing: "-0.4px",
+              }}
+            >
+              Join a room
+            </h2>
+            <p style={{ fontSize: 13, color: "#6b6b72", marginTop: 2 }}>
+              Enter a 6-character room code to join.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#6b6b72",
+              padding: 6,
+              borderRadius: 8,
+              display: "flex",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#1c1c1f";
+              e.currentTarget.style.color = "#e4e4e7";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "none";
+              e.currentTarget.style.color = "#6b6b72";
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ height: 1, background: "#1c1c1f", margin: "18px 0" }} />
+
+        {error && (
+          <div
+            style={{
+              background: "rgba(239,68,68,0.08)",
+              border: "1px solid rgba(239,68,68,0.2)",
+              borderRadius: 10,
+              padding: "10px 14px",
+              marginBottom: 16,
+              fontSize: 13,
+              color: "#ef4444",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <form
+          onSubmit={handleJoin}
+          style={{ display: "flex", flexDirection: "column", gap: 20 }}
+        >
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#a1a1aa",
+                marginBottom: 7,
+              }}
+            >
+              Room code
+            </label>
+            <input
+              autoFocus
+              value={code}
+              onChange={(e) => {
+                setCode(
+                  e.target.value
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9]/g, "")
+                    .slice(0, 6),
+                );
+                setError("");
+              }}
+              placeholder="ABC123"
+              maxLength={6}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                background: "#1c1c1f",
+                border: "1px solid #2a2a2e",
+                borderRadius: 10,
+                padding: "14px",
+                color: "#e4e4e7",
+                fontSize: 26,
+                fontWeight: 800,
+                letterSpacing: "0.35em",
+                textAlign: "center",
+                fontFamily: "'JetBrains Mono', monospace",
+                outline: "none",
+                transition: "border-color 0.15s, box-shadow 0.15s",
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "#22c55e";
+                e.target.style.boxShadow = "0 0 0 3px rgba(34,197,94,0.12)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "#2a2a2e";
+                e.target.style.boxShadow = "none";
+              }}
+            />
+            {/* Progress dots */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: 6,
+                marginTop: 10,
+              }}
+            >
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: i < code.length ? "#22c55e" : "#2a2a2e",
+                    transition: "background 0.15s",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                background: "transparent",
+                border: "1px solid #2a2a2e",
+                borderRadius: 10,
+                padding: "10px",
+                cursor: "pointer",
+                color: "#a1a1aa",
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: "system-ui, sans-serif",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#3a3a3f";
+                e.currentTarget.style.color = "#e4e4e7";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#2a2a2e";
+                e.currentTarget.style.color = "#a1a1aa";
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={code.length !== 6}
+              style={{
+                flex: 1,
+                background: "#22c55e",
+                color: "#000",
+                border: "none",
+                borderRadius: 10,
+                padding: "10px",
+                cursor: code.length !== 6 ? "not-allowed" : "pointer",
+                fontSize: 14,
+                fontWeight: 700,
+                fontFamily: "system-ui, sans-serif",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                opacity: code.length !== 6 ? 0.4 : 1,
+                transition: "background 0.15s, opacity 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                if (code.length === 6)
+                  e.currentTarget.style.background = "#16a34a";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#22c55e";
+              }}
+            >
+              <ArrowRight size={14} /> Join room
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Room Card ────────────────────────────────────────────────────────────────
+
+function RoomCard({ room }: { room: any }) {
+  const router = useRouter();
+  return (
+    <div
+      onClick={() => router.push(`/room/${room.code}`)}
+      style={{
+        background: "#111113",
+        border: "1px solid #2a2a2e",
+        borderRadius: 14,
+        padding: "20px 22px",
+        cursor: "pointer",
+        transition: "border-color 0.15s, background 0.15s",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "#3a3a3f";
+        e.currentTarget.style.background = "#161618";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "#2a2a2e";
+        e.currentTarget.style.background = "#111113";
+      }}
+    >
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}
+      >
+        {/* Icon */}
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 11,
+            background: "#1c1c1f",
+            border: "1px solid #2a2a2e",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Hash size={17} color="#22c55e" />
+        </div>
+        {/* Info */}
+        <div style={{ minWidth: 0 }}>
+          <p
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#e4e4e7",
+              letterSpacing: "-0.2px",
+              marginBottom: 5,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {room.name}
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <CopyCode code={room.code} />
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 12,
+                color: "#6b6b72",
+              }}
+            >
+              <Clock size={11} />
+              {timeAgo(room.createdAt)}
+            </span>
           </div>
         </div>
       </div>
 
-      <main className="container mx-auto px-4 py-24 max-w-6xl">
-        {/* Welcome */}
-        <div className="mb-12 space-y-2">
-          <h2 className="text-5xl font-bold text-slate-50">Welcome back!</h2>
-          <p className="text-lg text-slate-400">
-            Start collaborating on code in real-time
-          </p>
+      {/* Open button */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "#1c1c1f",
+          border: "1px solid #2a2a2e",
+          borderRadius: 8,
+          padding: "7px 14px",
+          color: "#a1a1aa",
+          fontSize: 13,
+          fontWeight: 600,
+          flexShrink: 0,
+          transition: "all 0.15s",
+          whiteSpace: "nowrap",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = "#22c55e";
+          e.currentTarget.style.color = "#22c55e";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = "#2a2a2e";
+          e.currentTarget.style.color = "#a1a1aa";
+        }}
+      >
+        Open <ArrowRight size={13} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const { user } = useUser();
+  const router = useRouter();
+  const rooms = useQuery(api.room.getRecent);
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filtered = (rooms ?? []).filter(
+    (r: any) =>
+      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      r.code.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const firstName = user?.firstName || user?.username || "there";
+  const greeting =
+    new Date().getHours() < 12
+      ? "morning"
+      : new Date().getHours() < 18
+        ? "afternoon"
+        : "evening";
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0a0a0b",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+      }}
+    >
+      <style>{`
+        @keyframes spin    { to { transform: rotate(360deg) } }
+        @keyframes fadeUp  { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+        .room-grid { animation: fadeUp 0.35s ease forwards; }
+      `}</style>
+
+      {/* ── Top nav ── */}
+      <nav
+        style={{
+          height: 56,
+          padding: "0 32px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid #1c1c1f",
+          background: "#0a0a0b",
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+        }}
+      >
+        {/* Logo */}
+        <Link
+          href="/"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            textDecoration: "none",
+          }}
+        >
+          <div
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 7,
+              background: "#22c55e",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Code2 size={14} color="#000" strokeWidth={2.5} />
+          </div>
+          <span
+            style={{
+              color: "#e4e4e7",
+              fontWeight: 700,
+              fontSize: 15,
+              letterSpacing: "-0.2px",
+            }}
+          >
+            Collabo
+          </span>
+        </Link>
+
+        {/* Right side */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <span
+            style={{
+              fontSize: 13,
+              color: "#6b6b72",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#22c55e",
+                display: "inline-block",
+              }}
+            />
+            {user?.emailAddresses?.[0]?.emailAddress}
+          </span>
+          <UserButton
+            afterSignOutUrl="/"
+            appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }}
+          />
+        </div>
+      </nav>
+
+      {/* ── Page body ── */}
+      <main
+        style={{ maxWidth: 900, margin: "0 auto", padding: "52px 24px 80px" }}
+      >
+        {/* Page header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            marginBottom: 40,
+            flexWrap: "wrap",
+            gap: 16,
+          }}
+        >
+          <div>
+            <h1
+              style={{
+                fontSize: 26,
+                fontWeight: 800,
+                color: "#fff",
+                letterSpacing: "-0.7px",
+                marginBottom: 5,
+              }}
+            >
+              Good {greeting}, {firstName}
+            </h1>
+            <p style={{ fontSize: 14, color: "#6b6b72" }}>
+              {rooms === undefined
+                ? "Loading rooms…"
+                : rooms.length === 0
+                  ? "Create your first room to start collaborating."
+                  : `${rooms.length} room${rooms.length === 1 ? "" : "s"} in your workspace`}
+            </p>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={() => setShowJoin(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                background: "#111113",
+                border: "1px solid #2a2a2e",
+                borderRadius: 10,
+                padding: "9px 18px",
+                cursor: "pointer",
+                color: "#a1a1aa",
+                fontSize: 14,
+                fontWeight: 600,
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#3a3a3f";
+                e.currentTarget.style.color = "#e4e4e7";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#2a2a2e";
+                e.currentTarget.style.color = "#a1a1aa";
+              }}
+            >
+              <Users size={14} /> Join room
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                background: "#22c55e",
+                border: "none",
+                borderRadius: 10,
+                padding: "9px 18px",
+                cursor: "pointer",
+                color: "#000",
+                fontSize: 14,
+                fontWeight: 700,
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#16a34a";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#22c55e";
+              }}
+            >
+              <Plus size={14} /> New room
+            </button>
+          </div>
         </div>
 
-        {/* Create / Join */}
-        <Card className="bg-slate-900/50 border-slate-800 shadow-xl rounded-2xl mb-12">
-          <CardContent className="p-8">
-            <div className="flex flex-row gap-8">
-              {/* Create Room Section */}
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-xl bg-emerald-500/10">
-                      <Plus className="h-6 w-6 text-emerald-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-50">
-                        Create Room
-                      </h3>
-                      <p className="text-sm text-slate-400">
-                        Start a new session
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-slate-300 text-sm">
-                    Create your own collaboration space and invite others with a
-                    unique room code.
-                  </p>
-                  <Button
-                    onClick={handleOpenCreateModal}
-                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold py-6 text-base"
-                  >
-                    <Plus className="h-5 w-5 mr-2" />
-                    Create New Room
-                  </Button>
-                </div>
-              </div>
+        {/* Search */}
+        {rooms && rooms.length > 0 && (
+          <div style={{ position: "relative", marginBottom: 20 }}>
+            <Search
+              size={14}
+              color="#6b6b72"
+              style={{
+                position: "absolute",
+                left: 14,
+                top: "50%",
+                transform: "translateY(-50%)",
+                pointerEvents: "none",
+              }}
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or code…"
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                background: "#111113",
+                border: "1px solid #2a2a2e",
+                borderRadius: 10,
+                padding: "10px 14px 10px 38px",
+                color: "#e4e4e7",
+                fontSize: 14,
+                fontFamily: "system-ui, sans-serif",
+                outline: "none",
+                transition: "border-color 0.15s, box-shadow 0.15s",
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "#22c55e";
+                e.target.style.boxShadow = "0 0 0 3px rgba(34,197,94,0.12)";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = "#2a2a2e";
+                e.target.style.boxShadow = "none";
+              }}
+            />
+          </div>
+        )}
 
-              {/* Divider */}
-              <div className="hidden md:flex items-center justify-center">
-                <div className="w-px h-full bg-slate-700/50"></div>
-              </div>
-              <div className="md:hidden flex items-center justify-center my-2">
-                <div className="h-px w-full bg-slate-700/50"></div>
-              </div>
-
-              {/* Join Room Section */}
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-xl bg-emerald-500/10">
-                      <Users className="h-6 w-6 text-emerald-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-50">
-                        Join Room
-                      </h3>
-                      <p className="text-sm text-slate-400">
-                        Enter an existing room
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-slate-300 text-sm">
-                    Have a room code? Enter it below to join an active
-                    collaboration session.
-                  </p>
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="room-code"
-                        className="text-sm font-medium text-slate-50"
-                      >
-                        Room Code
-                      </Label>
-                      <Input
-                        id="room-code"
-                        placeholder="Enter 6-character code"
-                        value={joinCode}
-                        onChange={(e) =>
-                          setJoinCode(e.target.value.toUpperCase())
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleJoinRoom();
-                        }}
-                        className="bg-slate-800 border-slate-700 text-slate-50 uppercase font-mono text-base h-12"
-                        maxLength={6}
-                      />
-                    </div>
-                    <Button
-                      onClick={handleJoinRoom}
-                      className="w-full border-2 border-emerald-500/50 bg-transparent hover:bg-emerald-500/10 text-slate-50 font-semibold py-6 text-base"
-                    >
-                      <Users className="h-5 w-5 mr-2" />
-                      Join Room
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <h3 className="text-2xl font-bold text-slate-50">Recent Rooms</h3>
-
-          {recentRooms.length === 0 ? (
-            <Card className="bg-slate-900/50 border-slate-800 rounded-2xl">
-              <CardContent className="p-10 text-center">
-                <p className="text-slate-400 text-lg">
-                  No room joined or created yet
-                </p>
-                <p className="text-slate-500 text-sm mt-2">
-                  Create or join a room to start collaborating
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {recentRooms.map((room) => (
-                <Card
-                  key={room._id} // Changed from room.id to room._id
-                  className="bg-slate-900/50 border-slate-800 hover:border-emerald-500/50 transition-colors rounded-2xl"
+        {/* Rooms list */}
+        {rooms === undefined ? (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              padding: "80px 0",
+            }}
+          >
+            <Loader2
+              size={20}
+              color="#22c55e"
+              style={{ animation: "spin 0.8s linear infinite" }}
+            />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "72px 24px",
+              border: "1px dashed #2a2a2e",
+              borderRadius: 16,
+            }}
+          >
+            {search ? (
+              <>
+                <p
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: "#e4e4e7",
+                    marginBottom: 6,
+                  }}
                 >
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <h4 className="text-lg font-semibold text-slate-50">
-                          {room.name}
-                        </h4>
-                        <div className="flex items-center gap-4 text-sm text-slate-400">
-                          <span className="flex items-center gap-1 font-mono text-emerald-400">
-                            {room.code}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            Created{" "}
-                            {new Date(room._creationTime).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <Button
-                        asChild
-                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
-                      >
-                        {/* We use room.code for the URL so the room page can find it */}
-                        <Link href={`/room/${room.code}`}>Open</Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+                  No rooms match &ldquo;{search}&rdquo;
+                </p>
+                <p style={{ fontSize: 13, color: "#6b6b72" }}>
+                  Try a different name or room code.
+                </p>
+              </>
+            ) : (
+              <>
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 14,
+                    background: "#111113",
+                    border: "1px solid #2a2a2e",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 16px",
+                  }}
+                >
+                  <Hash size={20} color="#3a3a3f" />
+                </div>
+                <p
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: "#e4e4e7",
+                    marginBottom: 6,
+                  }}
+                >
+                  No rooms yet
+                </p>
+                <p style={{ fontSize: 13, color: "#6b6b72", marginBottom: 22 }}>
+                  Create a room and invite your team to start coding together.
+                </p>
+                <button
+                  onClick={() => setShowCreate(true)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "#22c55e",
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "10px 22px",
+                    cursor: "pointer",
+                    color: "#000",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  <Plus size={14} /> Create your first room
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <div
+            className="room-grid"
+            style={{ display: "flex", flexDirection: "column", gap: 10 }}
+          >
+            {/* Section label */}
+            <p
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#3a3a3f",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                marginBottom: 4,
+                paddingLeft: 2,
+              }}
+            >
+              Your rooms · {filtered.length}
+            </p>
+            {filtered.map((room: any) => (
+              <RoomCard key={room._id} room={room} />
+            ))}
+          </div>
+        )}
       </main>
 
-      {/* Create Room Modal */}
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-slate-50 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">
-              Create Room
-            </DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Set up your collaboration space
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6 mt-4">
-            <div className="space-y-2">
-              <Label
-                htmlFor="project-name"
-                className="text-sm font-medium text-slate-50"
-              >
-                Project Name
-              </Label>
-              <Input
-                id="project-name"
-                placeholder="My Awesome Project"
-                value={roomName}
-                onChange={(e) => setRoomName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateRoom();
-                }}
-                className="bg-slate-800 border-slate-700 text-slate-50"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-slate-50">
-                Room Code
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  readOnly
-                  value={generatedCode}
-                  className="bg-slate-800 border-slate-700 text-slate-50 font-mono text-lg"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => handleCopyCode(generatedCode)}
-                  className="border-slate-700 text-slate-50 hover:bg-slate-800"
-                >
-                  {isCopied ? (
-                    <Check className="h-4 w-4 text-emerald-400" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-slate-500">
-                Share this code with others to invite them
-              </p>
-            </div>
-
-            <Button
-              onClick={handleCreateRoom}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold"
-            >
-              Create Room
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {showCreate && (
+        <CreateRoomModal
+          onClose={() => setShowCreate(false)}
+          onCreated={(code) => {
+            setShowCreate(false);
+            router.push(`/room/${code}`);
+          }}
+        />
+      )}
+      {showJoin && <JoinRoomModal onClose={() => setShowJoin(false)} />}
     </div>
   );
 }

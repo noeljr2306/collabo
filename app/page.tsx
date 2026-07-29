@@ -25,9 +25,9 @@ const CODE_LINES = [
 ];
 
 const CURSORS = [
-  { name: "Amara", color: "#818cf8", line: 3, offset: 24 },
-  { name: "Tunde", color: "#fb923c", line: 8, offset: 18 },
-  { name: "Zara",  color: "#34d399", line: 11, offset: 4  },
+  { name: "Kizito", color: "#818cf8", line: 3, offset: 24 },
+  { name: "Joshua", color: "#fb923c", line: 8, offset: 18 },
+  { name: "Marho",  color: "#34d399", line: 11, offset: 4  },
 ];
 
 function CodeDemo() {

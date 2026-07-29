@@ -259,3 +259,193 @@
 .sash:hover {
   background: #007acc !important;
 }
+/* 
+  Collabo — Clerk component overrides
+  Import this in app/globals.css: @import "./clerk-styles.css";
+  or paste directly at the bottom of globals.css
+*/
+
+/* ── Card shell ── */
+.cl-rootBox { width: 100%; }
+.cl-card {
+  background: #111113 !important;
+  border: 1px solid #2a2a2e !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.4) !important;
+  padding: 28px 28px 20px !important;
+}
+
+/* ── Header ── */
+.cl-headerTitle {
+  color: #ffffff !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.4px !important;
+}
+.cl-headerSubtitle {
+  color: #6b6b72 !important;
+  font-size: 13px !important;
+}
+
+/* ── Social / OAuth buttons ── */
+.cl-socialButtonsBlockButton {
+  background: #1c1c1f !important;
+  border: 1px solid #2a2a2e !important;
+  border-radius: 10px !important;
+  color: #a1a1aa !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  transition: all 0.15s ease !important;
+  height: 40px !important;
+}
+.cl-socialButtonsBlockButton:hover {
+  background: #252528 !important;
+  border-color: #3a3a3f !important;
+  color: #e4e4e7 !important;
+}
+.cl-socialButtonsBlockButtonText { color: inherit !important; }
+.cl-socialButtonsProviderIcon { opacity: 0.8 !important; }
+
+/* ── Divider ── */
+.cl-dividerLine { background: #2a2a2e !important; }
+.cl-dividerText { color: #3a3a3f !important; font-size: 11px !important; }
+
+/* ── Form fields ── */
+.cl-formFieldLabel {
+  color: #a1a1aa !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  margin-bottom: 5px !important;
+}
+.cl-formFieldInput {
+  background: #1c1c1f !important;
+  border: 1px solid #2a2a2e !important;
+  border-radius: 10px !important;
+  color: #e4e4e7 !important;
+  font-size: 14px !important;
+  height: 40px !important;
+  transition: border-color 0.15s, box-shadow 0.15s !important;
+}
+.cl-formFieldInput:focus {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.12) !important;
+  outline: none !important;
+}
+.cl-formFieldInput::placeholder { color: #3a3a3f !important; }
+
+/* ── Password show/hide ── */
+.cl-formFieldInputShowPasswordButton { color: #6b6b72 !important; }
+.cl-formFieldInputShowPasswordButton:hover { color: #a1a1aa !important; }
+
+/* ── Primary button ── */
+.cl-formButtonPrimary {
+  background: #22c55e !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  border-radius: 10px !important;
+  border: none !important;
+  height: 42px !important;
+  box-shadow: none !important;
+  transition: background 0.15s !important;
+}
+.cl-formButtonPrimary:hover:not(:disabled) { background: #16a34a !important; }
+.cl-formButtonPrimary:disabled { opacity: 0.5 !important; }
+
+/* ── Footer links ── */
+.cl-footerActionText { color: #6b6b72 !important; font-size: 13px !important; }
+.cl-footerActionLink {
+  color: #22c55e !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  transition: color 0.15s !important;
+}
+.cl-footerActionLink:hover { color: #16a34a !important; }
+
+/* ── OTP / verification code ── */
+.cl-otpCodeFieldInput {
+  background: #1c1c1f !important;
+  border: 1px solid #2a2a2e !important;
+  border-radius: 10px !important;
+  color: #e4e4e7 !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+}
+.cl-otpCodeFieldInput:focus {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.12) !important;
+}
+
+/* ── Alerts / errors ── */
+.cl-alert {
+  background: rgba(239,68,68,0.08) !important;
+  border: 1px solid rgba(239,68,68,0.2) !important;
+  border-radius: 10px !important;
+}
+.cl-alertText { color: #ef4444 !important; font-size: 13px !important; }
+.cl-formFieldErrorText { color: #ef4444 !important; font-size: 12px !important; }
+.cl-formFieldSuccessText { color: #22c55e !important; font-size: 12px !important; }
+
+/* ── Identity preview ── */
+.cl-identityPreviewText { color: #e4e4e7 !important; }
+.cl-identityPreviewEditButton { color: #22c55e !important; }
+.cl-identityPreviewEditButtonIcon { color: #22c55e !important; }
+
+/* ── Back link ── */
+.cl-backLink { color: #22c55e !important; font-size: 13px !important; }
+.cl-backLink:hover { color: #16a34a !important; }
+
+/* ── Spinner / loader ── */
+.cl-spinner { color: #22c55e !important; }
+.cl-loading { opacity: 0.7 !important; }
+
+/* ── Checkbox ── */
+.cl-formFieldCheckboxInput { border-color: #2a2a2e !important; }
+.cl-formFieldCheckboxInput:checked {
+  background: #22c55e !important;
+  border-color: #22c55e !important;
+}
+.cl-formFieldCheckboxLabel { color: #a1a1aa !important; font-size: 13px !important; }
+
+/* ── Badge (e.g. "Verified") ── */
+.cl-badge {
+  background: rgba(34,197,94,0.1) !important;
+  color: #22c55e !important;
+  border-color: rgba(34,197,94,0.2) !important;
+  font-size: 11px !important;
+}
+
+/* ── Internal backgrounds — prevent white flash ── */
+.cl-scrollBox,
+.cl-pageScrollBox,
+.cl-internal-b3fm6y { background: transparent !important; }
+
+/* ── Modal backdrop ── */
+.cl-modalBackdrop {
+  background: rgba(0,0,0,0.75) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+/* ── User button (top nav) ── */
+.cl-userButtonAvatarBox { border: 1px solid #2a2a2e !important; }
+.cl-userButtonPopoverCard {
+  background: #111113 !important;
+  border: 1px solid #2a2a2e !important;
+  border-radius: 12px !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5) !important;
+}
+.cl-userButtonPopoverActionButton {
+  color: #a1a1aa !important;
+  font-size: 13px !important;
+  border-radius: 8px !important;
+}
+.cl-userButtonPopoverActionButton:hover {
+  background: #1c1c1f !important;
+  color: #e4e4e7 !important;
+}
+.cl-userButtonPopoverActionButtonText { color: inherit !important; }
+.cl-userButtonPopoverActionButtonIcon { color: inherit !important; opacity: 0.7 !important; }
+.cl-userButtonPopoverFooter { border-top: 1px solid #1c1c1f !important; }
+.cl-userPreviewMainIdentifier { color: #e4e4e7 !important; font-weight: 600 !important; }
+.cl-userPreviewSecondaryIdentifier { color: #6b6b72 !important; font-size: 12px !important; }
+.cl-navbar { display: none !important; }
