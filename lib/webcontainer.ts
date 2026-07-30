@@ -1,5 +1,6 @@
 // lib/webcontainer.ts
-// WebContainer singleton + filesystem sync to Convex
+// WebContainer singleton. Each room gets its own isolated directory: /rooms/<roomId>/
+// This prevents cross-room contamination — commands in one room don't affect another.
 
 let instance: any = null;
 let bootPromise: Promise<any> | null = null;
@@ -7,40 +8,51 @@ let bootPromise: Promise<any> | null = null;
 export async function getWebContainer(): Promise<any> {
   if (instance) return instance;
   if (bootPromise) return bootPromise;
-
   bootPromise = (async () => {
     const { WebContainer } = await import("@webcontainer/api");
     instance = await WebContainer.boot();
     return instance;
   })();
-
   return bootPromise;
+}
+
+/** Get the isolated working directory path for a room */
+export function roomWorkDir(roomId: string): string {
+  return `/rooms/${roomId}`;
+}
+
+/** Ensure the room's working directory exists */
+export async function ensureRoomDir(wc: any, roomId: string): Promise<void> {
+  const path = roomWorkDir(roomId);
+  try {
+    await wc.fs.mkdir(path, { recursive: true });
+  } catch {
+    // Already exists — fine
+  }
 }
 
 // ─── Filesystem helpers ───────────────────────────────────────────────────────
 
 export interface FSFile {
-  path: string; // full path e.g. "my-app/src/main.tsx"
+  path: string;
   content: string;
   isFolder: boolean;
 }
 
 /**
- * Recursively read all files from a WebContainer directory.
- * Returns a flat list of { path, content, isFolder } entries.
+ * Recursively read all files from a directory inside WebContainer.
+ * Returns flat list of { path, content, isFolder }.
+ * path is relative to the starting dirPath.
  */
 export async function readWCDirectory(
   wc: any,
-  dirPath: string = "/",
+  dirPath: string,
   base: string = "",
 ): Promise<FSFile[]> {
   const results: FSFile[] = [];
-
   try {
     const entries = await wc.fs.readdir(dirPath, { withFileTypes: true });
-
     for (const entry of entries) {
-      // Skip node_modules, .git, hidden dirs
       if (
         entry.name === "node_modules" ||
         entry.name === ".git" ||
@@ -48,14 +60,12 @@ export async function readWCDirectory(
       )
         continue;
 
-      const fullPath =
-        dirPath === "/" ? `/${entry.name}` : `${dirPath}/${entry.name}`;
+      const fullPath = `${dirPath}/${entry.name}`;
       const relativePath = base ? `${base}/${entry.name}` : entry.name;
 
       if (entry.isDirectory()) {
         results.push({ path: relativePath, content: "", isFolder: true });
-        const children = await readWCDirectory(wc, fullPath, relativePath);
-        results.push(...children);
+        results.push(...(await readWCDirectory(wc, fullPath, relativePath)));
       } else {
         try {
           const raw = await wc.fs.readFile(fullPath, "utf-8");
@@ -65,20 +75,16 @@ export async function readWCDirectory(
             isFolder: false,
           });
         } catch {
-          // Binary file or unreadable — skip
+          /* binary or unreadable */
         }
       }
     }
   } catch {
-    // Directory doesn't exist or unreadable
+    /* dir doesn't exist */
   }
-
   return results;
 }
 
-/**
- * Detect language from filename for Monaco
- */
 export function langFromName(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   const map: Record<string, string> = {

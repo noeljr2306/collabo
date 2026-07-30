@@ -2,7 +2,7 @@
 import { useCallback, useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { readWCDirectory, langFromName } from "@/lib/webcontainer";
+import { readWCDirectory, langFromName, roomWorkDir } from "@/lib/webcontainer";
 
 export function useWCSync(roomId: string) {
   const createFile = useMutation(api.room.createFile);
@@ -16,13 +16,12 @@ export function useWCSync(roomId: string) {
       isSyncing.current = true;
 
       try {
-        const files = await readWCDirectory(wc, "/");
-
-        // Only process files we haven't seen yet
+        // Read from the room's isolated directory, not from root
+        const workDir = roomWorkDir(roomId);
+        const files = await readWCDirectory(wc, workDir);
         const newFiles = files.filter((f) => !knownPaths.current.has(f.path));
         if (newFiles.length === 0) return;
 
-        // Create files sequentially to avoid rate-limit hammering
         for (const file of newFiles) {
           knownPaths.current.add(file.path);
           const name = file.path.split("/").pop() ?? file.path;
@@ -35,9 +34,8 @@ export function useWCSync(roomId: string) {
               content: file.content,
               parentId: undefined,
             });
-          } catch (e) {
-            // If already exists, just skip it
-            console.warn("[WCSync] skipped:", file.path, e);
+          } catch {
+            /* already exists */
           }
         }
       } catch (e) {
@@ -49,73 +47,45 @@ export function useWCSync(roomId: string) {
     [roomId, createFile],
   );
 
-  /**
-   * Start watching the WC filesystem.
-   * Returns a cleanup function to stop watching.
-   */
   const startWatching = useCallback(
     (wc: any): (() => void) => {
       if (!wc) return () => {};
 
       let stopped = false;
+      let lastCount = 0;
       let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
       const triggerSync = () => {
         if (stopped) return;
         if (debounceTimer) clearTimeout(debounceTimer);
-        // Debounce 2s — Vite scaffolding writes many files in rapid succession
         debounceTimer = setTimeout(() => {
           if (!stopped) void syncAll(wc);
-        }, 2000);
+        }, 2500);
       };
 
-      // Try native wc.fs.watch first (supported in newer WC versions)
-      let watcher: any = null;
-      try {
-        watcher = wc.fs.watch(
-          "/",
-          { recursive: true },
-          (event: string, filename: string) => {
-            if (!filename) return;
-            // Ignore node_modules and hidden
-            if (filename.includes("node_modules") || filename.includes("/."))
-              return;
-            console.log("[WCSync] fs event:", event, filename);
+      const poll = async () => {
+        if (stopped) return;
+        try {
+          const workDir = roomWorkDir(roomId);
+          const files = await readWCDirectory(wc, workDir);
+          if (files.length !== lastCount) {
+            lastCount = files.length;
             triggerSync();
-          },
-        );
-      } catch {
-        // wc.fs.watch not available — fall back to polling
-        console.log("[WCSync] fs.watch unavailable, using polling");
-        const POLL_INTERVAL = 3000; // poll every 3s
-        let lastCount = 0;
+          }
+        } catch {
+          /* not ready yet */
+        }
+        if (!stopped) setTimeout(poll, 2000);
+      };
 
-        const poll = async () => {
-          if (stopped) return;
-          try {
-            const files = await readWCDirectory(wc, "/");
-            const newCount = files.length;
-            if (newCount !== lastCount) {
-              lastCount = newCount;
-              triggerSync();
-            }
-          } catch {}
-          if (!stopped) setTimeout(poll, POLL_INTERVAL);
-        };
-
-        // Start polling after a short delay to let WC settle
-        setTimeout(poll, 3000);
-      }
-
+      const startTimer = setTimeout(poll, 1000);
       return () => {
         stopped = true;
+        clearTimeout(startTimer);
         if (debounceTimer) clearTimeout(debounceTimer);
-        try {
-          watcher?.close();
-        } catch {}
       };
     },
-    [syncAll],
+    [roomId, syncAll],
   );
 
   return { syncAll, startWatching };
