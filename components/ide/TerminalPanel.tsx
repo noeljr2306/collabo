@@ -9,7 +9,11 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import { getWebContainer } from "@/lib/webcontainer";
+import {
+  getWebContainer,
+  ensureRoomDir,
+  roomWorkDir,
+} from "@/lib/webcontainer";
 import { useWCSync } from "@/hooks/useWCSync";
 
 interface TerminalPanelProps {
@@ -43,7 +47,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
 
   const { syncAll, startWatching } = useWCSync(roomId);
 
-  // ── Manual sync handler ───────────────────────────────────────────────────
   const handleManualSync = useCallback(async () => {
     if (!wcRef.current || syncing) return;
     setSyncing(true);
@@ -60,7 +63,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
     }
   }, [syncAll, syncing]);
 
-  // ── Boot WebContainer ─────────────────────────────────────────────────────
   useEffect(() => {
     if (bootedRef.current) return;
     bootedRef.current = true;
@@ -69,16 +71,13 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
       try {
         const wc = await getWebContainer();
         wcRef.current = wc;
+
+        // Create the room's working directory
+        await ensureRoomDir(wc, roomId);
+
         setStatus("ready");
-
-        // Do an initial sync to pick up any existing files
         await syncAll(wc);
-
-        // Start filesystem watcher — auto-syncs when files change
-        const cleanup = startWatching(wc);
-        watchCleanup.current = cleanup;
-
-        // Spawn first terminal
+        watchCleanup.current = startWatching(wc);
         await spawnTerminal(1, wc);
       } catch (err: any) {
         setStatus("error");
@@ -92,14 +91,13 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Spawn xterm + shell ───────────────────────────────────────────────────
   const spawnTerminal = async (id: number, wc: any) => {
     if (!containerRef.current || termDivs.current.has(id)) return;
 
     const div = document.createElement("div");
     div.style.cssText =
-      "position:absolute;inset:0;width:100%;height:100%;padding:4px 8px;" +
-      "background:#0a0a0b;overflow:hidden;display:block;";
+      "position:absolute;inset:0;width:100%;height:100%;" +
+      "padding:4px 8px;background:#0a0a0b;overflow:hidden;display:block;";
     containerRef.current.appendChild(div);
     termDivs.current.set(id, div);
     showTab(id);
@@ -144,13 +142,16 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
     term.loadAddon(fit);
     term.open(div);
 
+    const workDir = roomWorkDir(roomId);
+
     setTimeout(() => {
       try {
         fit.fit();
       } catch {}
-      term.writeln("\x1b[1;32m⚡ Collabo Terminal\x1b[0m — WebContainer ready");
+      term.writeln(`\x1b[1;32m⚡ Collabo Terminal\x1b[0m`);
+      term.writeln(`\x1b[2mWorking directory: ${workDir}\x1b[0m`);
       term.writeln(
-        "\x1b[2mFiles created here sync automatically to the Explorer.\x1b[0m",
+        `\x1b[2mFiles created here sync automatically to the Explorer.\x1b[0m`,
       );
       term.writeln("");
     }, 150);
@@ -162,14 +163,28 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
     });
     ro.observe(div);
 
+    // ── KEY FIX: spawn bash with cwd set to the room directory ──
+    // This means every command runs inside /rooms/<roomId>/ by default.
+    // cd, node, npm — all work relative to this directory.
+    // No need to send a cd command after spawn.
     const shell = await wc.spawn("bash", [], {
       terminal: { cols: term.cols, rows: term.rows },
+      env: {
+        // HOME must be the room dir so bash starts there automatically
+        HOME: workDir,
+        PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        TERM: "xterm-color",
+        // Clean prompt: [roomId] ~/current/path $
+        PS1: `\\[\\033[1;32m\\][${roomId}]\\[\\033[0m\\] \\[\\033[1;34m\\]\\w\\[\\033[0m\\]\\$ `,
+      },
     });
 
+    // Pipe output to terminal
     shell.output.pipeTo(
       new WritableStream({ write: (data: string) => term.write(data) }),
     );
 
+    // Pipe input to shell — no cd needed, HOME is already set
     const writer = shell.input.getWriter();
     term.onData((data: string) => writer.write(data));
     term.onResize(({ cols, rows }: any) => shell.resize({ cols, rows }));
@@ -254,7 +269,7 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
     >
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
-      {/* ── Tab bar ── */}
+      {/* Tab bar */}
       <div
         style={{
           height: 36,
@@ -266,7 +281,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
           overflow: "hidden",
         }}
       >
-        {/* Label */}
         <div
           style={{
             display: "flex",
@@ -292,7 +306,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
           </span>
         </div>
 
-        {/* Tabs */}
         {tabs.map((tab) => (
           <div
             key={tab.id}
@@ -336,7 +349,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
           </div>
         ))}
 
-        {/* New tab */}
         <button
           onClick={addTab}
           style={{
@@ -349,7 +361,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
             display: "flex",
             alignItems: "center",
             flexShrink: 0,
-            transition: "color 0.15s",
           }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "#e4e4e7")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "#6b6b72")}
@@ -359,18 +370,16 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
 
         <div style={{ flex: 1 }} />
 
-        {/* Last sync time */}
         {lastSync && !syncing && (
           <span style={{ fontSize: 10, color: "#3a3a3f", paddingRight: 8 }}>
             synced {lastSync}
           </span>
         )}
 
-        {/* Sync Files button */}
         <button
           onClick={handleManualSync}
           disabled={syncing || status !== "ready"}
-          title="Sync terminal filesystem to Explorer"
+          title="Sync files to Explorer"
           style={{
             display: "flex",
             alignItems: "center",
@@ -380,19 +389,11 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
             background: "none",
             border: "none",
             borderLeft: "1px solid #1c1c1f",
-            cursor: syncing || status !== "ready" ? "not-allowed" : "pointer",
+            cursor: syncing ? "not-allowed" : "pointer",
             color: syncing ? "#3a3a3f" : "#22c55e",
             fontSize: 11,
             fontWeight: 600,
             flexShrink: 0,
-            transition: "color 0.15s",
-          }}
-          onMouseEnter={(e) => {
-            if (!syncing && status === "ready")
-              (e.currentTarget as HTMLElement).style.background = "#111113";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = "none";
           }}
         >
           <RefreshCw
@@ -404,7 +405,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
           {syncing ? "Syncing…" : "Sync Files"}
         </button>
 
-        {/* Close */}
         <button
           onClick={onClose}
           style={{
@@ -418,7 +418,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
             display: "flex",
             alignItems: "center",
             flexShrink: 0,
-            transition: "color 0.15s",
           }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "#e4e4e7")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "#6b6b72")}
@@ -427,7 +426,7 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
         </button>
       </div>
 
-      {/* ── Content ── */}
+      {/* Content */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         {status === "booting" && (
           <div
@@ -450,7 +449,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
             <span style={{ fontSize: 13, color: "#6b6b72" }}>{statusMsg}</span>
           </div>
         )}
-
         {status === "error" && (
           <div
             style={{
@@ -469,7 +467,7 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
           >
             <span style={{ fontSize: 13, color: "#ef4444" }}>{statusMsg}</span>
             <p style={{ fontSize: 12, color: "#6b6b72", lineHeight: 1.7 }}>
-              Requires Chrome/Edge with headers:
+              Requires Chrome/Edge with:
               <br />
               <code style={{ color: "#eab308", fontSize: 11 }}>
                 Cross-Origin-Opener-Policy: same-origin
@@ -481,7 +479,6 @@ export default function TerminalPanel({ roomId, onClose }: TerminalPanelProps) {
             </p>
           </div>
         )}
-
         <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
       </div>
     </div>
